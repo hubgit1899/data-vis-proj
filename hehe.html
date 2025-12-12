@@ -321,11 +321,11 @@
               </tr>
               <tr>
                 <td>Nafeel Mannan</td>
-                <td></td>
+                <td>455323</td>
               </tr>
               <tr>
                 <td>Meerab Chaudhary</td>
-                <td></td>
+                <td>477284</td>
               </tr>
               <tr>
                 <td>Junaid Alam</td>
@@ -343,7 +343,7 @@
       <!-- ABSTRACT -->
       <section>
         <h2>Abstract</h2>
-        <p>In the United States, traffic fatalities remain a persistent and tragic public health crisis. Every year, nearly 40,000 lives are lost on American roadways. While traditional analyses often focus on immediate mechanical or behavioral factors—such as speeding, alcohol consumption, or weather conditions—these are often symptoms of deeper, structural issues rather than root causes. This report documents an extensive, multi-week data science investigation into a less visible, socio-economic driver of road safety: <strong>Educational Attainment.</strong></p>
+        <p>In the United States, traffic fatalities remain a persistent and tragic public health crisis. Every year, nearly 40,000 lives are lost on American roadways. While traditional analyses often focus on immediate mechanical or behavioral factors, such as speeding, alcohol consumption, or weather conditions. These are often symptoms of deeper, structural issues rather than root causes. This report documents an extensive, multi-week data science investigation into a less visible, socio-economic driver of road safety: <strong>Educational Attainment.</strong></p>
         
         <p>Using 14 years of robust data from the National Highway Traffic Safety Administration (NHTSA) and the US Census Bureau, we processed, cleaned, and analyzed over 40,000 county-year records to test the hypothesis that communities with lower educational attainment suffer from disproportionately high traffic fatality rates.</p>
         
@@ -410,8 +410,8 @@
         <h3>3.1 The Sources</h3>
         <p>We utilized two primary datasets, considered the "Gold Standard" in their respective fields:</p>
         <ol>
-          <li><strong>NHTSA FARS (Fatality Analysis Reporting System)</strong>: This is a census of every fatal crash in the US. It contains detailed files (<code>ACCIDENT</code>, <code>PERSON</code>, <code>VEHICLE</code>) for every year. We downloaded these files for <code>2010 to 2023</code>.</li>
-          <li><strong>USDA/Census Education Data</strong>: The <code>EducationYYYY.csv</code> files provided county-level breakdown of educational attainment (e.g., "Percent of adults with less than a high school diploma").</li>
+          <li><strong><a href="https://www.nhtsa.gov/research-data/fatality-analysis-reporting-system-fars" target="_blank" rel="noopener noreferrer">NHTSA FARS (Fatality Analysis Reporting System)</a></strong>: This is a census of every fatal crash in the US. It contains detailed files (<code>ACCIDENT</code>, <code>PERSON</code>, <code>VEHICLE</code>) for every year. We downloaded these files for <code>2010 to 2023</code>.</li>
+          <li><strong><a href="https://www.ers.usda.gov/data-products/county-level-data-sets" target="_blank" rel="noopener noreferrer">USDA/Census Education Data</a></strong>: The <code>EducationYYYY.csv</code> files provided county-level breakdown of educational attainment (e.g., "Percent of adults with less than a high school diploma").</li>
         </ol>
 
         <h3>3.2 The Challenge of Schema Drift</h3>
@@ -421,10 +421,10 @@
           <li>In 2020, likely due to a system upgrade, it became <code>WEATHER1</code>.</li>
           <li>Codes for "Overturning" or "Hit and Run" shifted.</li>
         </ul>
-        <p>We built a robust Python pipeline (<code>code/analysis_report_v2.py</code>) to systematically detect, map, and standardize these columns across all 14 years. This ensured that a "Rainy Code 2" in 2010 meant the same thing as a "Rainy Code 2" in 2023, preserving the integrity of our longitudinal analysis.</p>
+        <p>We built a robust Python pipeline (<a id="repo-code-link" target="_blank" rel="noopener noreferrer" style="text-decoration:none; color:inherit;"><code>code/analysis_report_v2.py</code></a>) to systematically detect, map, and standardize these columns across all 14 years. This ensured that a "Rainy Code 2" in 2010 meant the same thing as a "Rainy Code 2" in 2023, preserving the integrity of our longitudinal analysis.</p>
 
         <h3>3.3 The FIPS Code Solution</h3>
-        <p>To merge crash data (which happens at a GPS coordinate) with education data (which happens at a county level), we needed a common key. We constructed <strong>FIPS Codes</strong> (Federal Information Processing Standards) by combining State IDs and County IDs.</p>
+        <p>To merge crash data (which happens at a GPS coordinate) with education data (which happens at a county level), we needed a common key. We constructed <strong><a href="https://www.census.gov/library/reference/code-lists/ansi.html" target="_blank" rel="noopener noreferrer">FIPS Codes</a></strong> (Federal Information Processing Standards) by combining State IDs and County IDs.</p>
         <p>Example: Alabama is <code>01</code>. Autauga County is <code>001</code>. The FIPS code is <code>01001</code>.</p>
         <p>By generating this 5-digit key for every single accident record, we could link a specific crash on a Tuesday night in rural Texas to the exact high school graduation rate of that county.</p>
 
@@ -498,7 +498,7 @@
           <figcaption>Fig 8: The distribution is right-skewed, with a 'long tail' of deadly rural counties.</figcaption>
         </figure>
 
-        <p>Most of America lives in counties with low to moderate fatality rates (0-20 per 100k). However, there is a "Long Tail" of counties with extreme rates (50, 80, even 100+). These outliers are almost exclusively small, rural populations where a single bad crash can skew the statistics—but the pattern is consistent enough across 14 years to be a real signal, not just noise.</p>
+        <p>Most of America lives in counties with low to moderate fatality rates (0-20 per 100k). However, there is a "Long Tail" of counties with extreme rates (50, 80, even 100+). These outliers are almost exclusively small, rural populations where a single bad crash can skew the statistics, but the pattern is consistent enough across 14 years to be a real signal, not just noise.</p>
 
         <h3>4.4 Bivariate Analysis: Proving the Correlation</h3>
         <p>This is where we tested our core question. We plotted <strong>% Less Than High School</strong> against <strong>Fatality Rate</strong>.</p>
@@ -571,7 +571,7 @@
 
         <h3>5.3 Darkness and Weather</h3>
         <p>We also investigated environmental factors.</p>
-        <p><strong>Darkness</strong>: We found that darkness plays a larger role in rural/low-edu areas. This makes sense—cities have streetlights. Rural roads are pitch black at night.</p>
+        <p><strong>Darkness</strong>: We found that darkness plays a larger role in rural/low-edu areas. This makes sense as cities have streetlights, while rural roads are pitch black at night.</p>
         
         <figure id="fig-darkness">
           <img src="../output/EDA_08_Bar_Dark.png" alt="Darkness Bar">
@@ -673,6 +673,9 @@
             </dd>
           </div>
         </dl>
+        <p>
+          <em>Generated by the DataViz Team. Analysis codebase available in <a id="repo-code-link" target="_blank" rel="noopener noreferrer" style="text-decoration:none; color:inherit;"><code>code/analysis_report_v2.py</code></a>.</em>
+        </p>
       </section>
 
       <!-- ADDITIONAL RESOURCES (New Page Section) -->
@@ -680,17 +683,34 @@
         <h2>Additional Resources</h2>
         <p>Explore the code, data, and contributors behind this study.</p>
         <div class="resource-links">
-          <a href="https://www.youtube.com/"
-   class="resource-btn"
-   target="_blank"
-   rel="noopener noreferrer">
-  GitHub Repository
-</a>
-          <a href="#" class="resource-btn">NHTSA FARS Data</a>
-          <a href="#" class="resource-btn">US Census Bureau</a>
+          <a href="https://github.com/hubgit1899/data-vis-proj"
+             class="resource-btn"
+             target="_blank"
+             rel="noopener noreferrer">
+            GitHub Repository
+          </a>
+          <a href="https://drive.google.com/file/d/1yVSYjFwmjF2bT-B2GEw2N8WiFM-wnONS/view?usp=sharing"
+             class="resource-btn"
+             target="_blank"
+             rel="noopener noreferrer">
+            Master Data Set
+          </a>
+          <a href="https://www.nhtsa.gov/research-data/fatality-analysis-reporting-system-fars" class="resource-btn" target="_blank" rel="noopener noreferrer">NHTSA FARS Data</a>
+          <a href="https://data.census.gov/" class="resource-btn" target="_blank" rel="noopener noreferrer">US Census Bureau</a>
         </div>
       </section>
 
     </div>
+    
+    <script>
+      // Dynamic GitHub Link Construction
+      const GITHUB_BASE = "https://github.com/hubgit1899/data-vis-proj";
+      
+      const codeLink = document.getElementById('repo-code-link');
+      if (codeLink) {
+        // Appending the path relative to the repo root
+        codeLink.href = `${GITHUB_BASE}/blob/main/code/analysis_report_v2.py`;
+      }
+    </script>
   </body>
 </html>
