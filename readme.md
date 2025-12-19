@@ -30,6 +30,7 @@ data-vis-proj/
 ├── datasets/                # Raw data files (not tracked in git)
 ├── output/                  # Generated visualizations (not tracked in git)
 ├── reports/                 # Written reports
+├── download_data.py         # Dataset downloader script
 ├── requirements.txt         # Python dependencies
 ├── setup.sh                 # macOS/Linux setup script
 ├── setup.bat                # Windows setup script
@@ -44,7 +45,22 @@ data-vis-proj/
 
 - **Python 3.8+** (for analysis)
 - **Node.js 18+** (for dashboard)
-- Internet connection (for GeoJSON data)
+- Internet connection (for downloading data and GeoJSON)
+
+### Step 0: Download Datasets
+
+First, download the required FARS and Education datasets:
+
+```bash
+# After running setup.sh or setup.bat, activate venv and run:
+python download_data.py
+```
+
+This will download and extract:
+- **FARS data** (2010-2023) from NHTSA
+- **Education data** instructions from USDA ERS
+
+> **Note**: Some education datasets may require manual download from [USDA ERS](https://www.ers.usda.gov/data-products/county-level-data-sets/).
 
 ### Option 1: Run Analysis Only
 
@@ -58,19 +74,25 @@ bash setup.sh
 # Activate virtual environment
 source venv/bin/activate
 
+# Download datasets
+python download_data.py
+
 # Run analysis
 python analysis-code/analysis_report_v2.py
 ```
 
 #### Windows
 ```cmd
-# Run setup script (double-click or run in Command Prompt)
+REM Run setup script (double-click or run in Command Prompt)
 setup.bat
 
-# Activate virtual environment
+REM Activate virtual environment
 venv\Scripts\activate.bat
 
-# Run analysis
+REM Download datasets
+python download_data.py
+
+REM Run analysis
 python analysis-code\analysis_report_v2.py
 ```
 
@@ -162,34 +184,81 @@ The React dashboard provides **two interactive views**:
 
 ---
 
-## 📁 Data Sources
+## 📁 Data Sources & Manual Download
+
+If the automatic download script fails, you can manually download the datasets:
 
 ### FARS (Fatality Analysis Reporting System)
 - **Source**: NHTSA (National Highway Traffic Safety Administration)
+- **Download Page**: https://www.nhtsa.gov/file-downloads?p=nhtsa/downloads/FARS/
 - **Years**: 2010-2023
 - **Contains**: Fatal accident records including alcohol involvement, weather conditions, lighting conditions
 
+| Year | Download Link |
+|------|---------------|
+| 2010 | https://www.nhtsa.gov/file-downloads/download?p=nhtsa/downloads/FARS/2010/National/FARS2010NationalCSV.zip |
+| 2011 | https://www.nhtsa.gov/file-downloads/download?p=nhtsa/downloads/FARS/2011/National/FARS2011NationalCSV.zip |
+| 2012 | https://www.nhtsa.gov/file-downloads/download?p=nhtsa/downloads/FARS/2012/National/FARS2012NationalCSV.zip |
+| 2013 | https://www.nhtsa.gov/file-downloads/download?p=nhtsa/downloads/FARS/2013/National/FARS2013NationalCSV.zip |
+| 2014 | https://www.nhtsa.gov/file-downloads/download?p=nhtsa/downloads/FARS/2014/National/FARS2014NationalCSV.zip |
+| 2015 | https://www.nhtsa.gov/file-downloads/download?p=nhtsa/downloads/FARS/2015/National/FARS2015NationalCSV.zip |
+| 2016 | https://www.nhtsa.gov/file-downloads/download?p=nhtsa/downloads/FARS/2016/National/FARS2016NationalCSV.zip |
+| 2017 | https://www.nhtsa.gov/file-downloads/download?p=nhtsa/downloads/FARS/2017/National/FARS2017NationalCSV.zip |
+| 2018 | https://www.nhtsa.gov/file-downloads/download?p=nhtsa/downloads/FARS/2018/National/FARS2018NationalCSV.zip |
+| 2019 | https://www.nhtsa.gov/file-downloads/download?p=nhtsa/downloads/FARS/2019/National/FARS2019NationalCSV.zip |
+| 2020 | https://www.nhtsa.gov/file-downloads/download?p=nhtsa/downloads/FARS/2020/National/FARS2020NationalCSV.zip |
+| 2021 | https://www.nhtsa.gov/file-downloads/download?p=nhtsa/downloads/FARS/2021/National/FARS2021NationalCSV.zip |
+| 2022 | https://www.nhtsa.gov/file-downloads/download?p=nhtsa/downloads/FARS/2022/National/FARS2022NationalCSV.zip |
+| 2023 | https://www.nhtsa.gov/file-downloads/download?p=nhtsa/downloads/FARS/2023/National/FARS2023NationalCSV.zip |
+
 ### US Census Education Data
-- **Source**: US Census Bureau
+- **Source**: USDA Economic Research Service
+- **Download Page**: https://www.ers.usda.gov/data-products/county-level-data-sets/
 - **Years**: 2010-2023
 - **Contains**: County-level educational attainment statistics
 
-### Required Data Structure
-Place data files in the `datasets/` folder:
+### Required Folder Structure
+
+After downloading, extract and organize files as follows:
+
 ```
 datasets/
-├── Education2010.csv
+├── Education2010.csv          # Census education data
 ├── Education2011.csv
-├── ...
+├── Education2012.csv
+├── Education2013.csv
+├── Education2014.csv
+├── Education2015.csv
+├── Education2016.csv
+├── Education2017.csv
+├── Education2018.csv
+├── Education2019.csv
+├── Education2020.csv
+├── Education2021.csv
+├── Education2022.csv
 ├── Education2023.csv
-├── FARS2010National/
-│   └── ACCIDENT.CSV
-├── FARS2011National/
-│   └── ACCIDENT.CSV
-├── ...
-└── FARS2023National/
-    └── ACCIDENT.CSV
+│
+├── FARS2010/                  # Extract ZIP contents here
+│   ├── accident.csv           # ← Required file (main accident data)
+│   ├── person.csv
+│   ├── vehicle.csv
+│   └── ... (other CSV files)
+│
+├── FARS2011/
+│   ├── accident.csv
+│   └── ...
+│
+├── FARS2012/
+│   └── ...
+│
+... (repeat for each year through 2023)
+│
+└── FARS2023/
+    ├── accident.csv
+    └── ...
 ```
+
+> **Important**: The analysis script looks for `accident.csv` (or `ACCIDENT.CSV`) inside each FARS folder. Make sure this file exists after extraction.
 
 ---
 
