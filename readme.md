@@ -300,6 +300,13 @@ This project was created for educational purposes as part of a Data Visualizatio
 
 ---
 
-## 👥 Authors
+## 👥 Collaborators
+
+| Name | GitHub |
+|------|--------|
+| Muhammad Ali Imran | [@CaptainAlpha04](https://github.com/CaptainAlpha04) |
+| Meerab Chaudhary | [@meerabc](https://github.com/meerabc) |
+| Nafeel Mannan | [@Nafeel-AC](https://github.com/Nafeel-AC) |
+| Junaid Alam | [@hubgit1899](https://github.com/hubgit1899) |
 
 Data Visualization Project - Fall 2025
