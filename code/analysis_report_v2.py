@@ -2,33 +2,60 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
+from matplotlib.lines import Line2D
+import matplotlib.patheffects as pe
 import seaborn as sns
 import os
 import matplotlib.gridspec as gridspec
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 from sklearn.ensemble import RandomForestRegressor
+import geopandas as gpd
 import warnings
 
 warnings.filterwarnings('ignore')
 
 # --- CONFIGURATION & DESIGN SYSTEM ---
-BASE_DIR = r"d:\Projects\DataVis Project"
+# Use the script's parent directory as base
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "datasets")
 OUTPUT_DIR = os.path.join(BASE_DIR, "output")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # 1. CONSISTENT COLOR PALETTE
 # We defined a strict dictionary to be used in ALL plots.
+# COLORS = {
+#     'primary': '#333333',    # Dark Grey (Neutral/Text)
+#     'danger': '#E74C3C',     # Vermilion (High Risk/Red) - Colorblind Safe
+#     'safety': '#27AE60',     # Bluish Green (Low Risk/Green) - Colorblind Safe
+#     'education': '#56B4E9',  # Sky Blue (Education) - Colorblind Safe
+#     'accent': '#F0E442',     # Yellow (Highlights) - Colorblind Safe
+#     'text': '#333333',       
+#     'grid': '#DDDDDD',       
+#     'bg': '#FFFFFF'          
+# }
+
 COLORS = {
-    'primary': '#34495E',    # Dark Blue-Grey (Neutral/Data)
-    'danger': '#E74C3C',     # Red (High Risk, Low Edu)
-    'safety': '#27AE60',     # Green (Low Risk, High Edu)
-    'accent': '#F39C12',     # Orange/Yellow (Analysis/Highlight)
-    'text': '#2C3E50',       # Dark Text
-    'grid': '#BDC3C7',       # Light Grey Grid
-    'bg': '#FFFFFF'          # White Background
+    'primary': '#333333',    # Dark Grey (Neutral/Text)
+    'danger': '#D55E00',     # Vermilion (High Risk/Red) - Colorblind Safe
+    'safety': '#009E73',     # Bluish Green (Low Risk/Green) - Colorblind Safe
+    'education': '#56B4E9',  # Sky Blue (Education) - Colorblind Safe
+    'accent': '#F0E442',     # Yellow (Highlights) - Colorblind Safe
+    'text': '#333333',       
+    'grid': '#DDDDDD',       
+    'bg': '#FFFFFF'          
 }
+
+# COLORS = {
+#     'primary': '#34495E',    # Dark Blue-Grey (Neutral/Data)
+#     'danger': '#E74C3C',     # Red (High Risk, Low Edu)
+#     'safety': '#27AE60',     # Green (Low Risk, High Edu)
+#     'accent': '#F39C12',     # Orange/Yellow (Analysis/Highlight)
+#     'text': '#2C3E50',       # Dark Text
+#     'grid': '#BDC3C7',       # Light Grey Grid
+#     'bg': '#FFFFFF'          # White Background
+# }
 
 # 2. GLOBAL PLOT SETTINGS
 plt.style.use('seaborn-v0_8-white')
@@ -132,6 +159,7 @@ def load_data():
     # Calc Rates
     df['Fatality_Rate'] = (df['FATALS'] / df['Population']) * 100000
     df['Drunk_Pct'] = (df['Drunk'] / df['ST_CASE']) * 100
+    df['Drunk_Rate_Per_100k'] = (df['Drunk'] / df['Population']) * 100000 # NEW METRIC
     df['Dark_Pct'] = (df['Dark'] / df['ST_CASE']) * 100
     df['Weather_Pct'] = (df['Bad_Weather'] / df['ST_CASE']) * 100
     
@@ -147,108 +175,269 @@ def save(name):
     plt.close()
     print(f"Saved {name}")
 
-# --- MAP GENERATOR (REFINED) ---
-def plot_state_grid(df, state_coords, value_col, title, filename, cmap, agg_func='mean'):
-    """Generates a tile grid map for any metric."""
-    if agg_func == 'mean':
-        state_val = df.groupby('State_Abbrev')[value_col].mean()
-        label_fmt = "{:.1f}"
-    else: # sum
-        state_val = df.groupby('State_Abbrev')[value_col].sum()
-        label_fmt = "{:,.0f}"
-
-    fig, ax = plt.subplots(figsize=(14, 9))
-    ax.set_aspect('equal')
-    ax.axis('off')
+# --- USA CHOROPLETH MAP GENERATOR ---
+def plot_usa_choropleth(df, value_col, title, filename, cmap, agg_func='mean', legend_label=None):
+    """Generates a proper USA choropleth map using actual state boundaries."""
     
-    norm = plt.Normalize(state_val.min(), state_val.max())
+    # Aggregate data by state
+    if agg_func == 'mean':
+        state_val = df.groupby('State_Abbrev')[value_col].mean().reset_index()
+    else:
+        state_val = df.groupby('State_Abbrev')[value_col].sum().reset_index()
+    state_val.columns = ['STUSPS', value_col]
+    
+    # Human readable format for values
+    def human_format(num):
+        if pd.isna(num):
+            return ''
+        if num >= 1e6:
+            return f'{num/1e6:.1f}M'
+        if num >= 1e3:
+            return f'{num/1e3:.0f}k'
+        return f'{num:.1f}'
+    
+    # Load US states GeoJSON directly
+    usa = gpd.read_file('https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json')
+    
+    # Create STUSPS from state names
+    state_abbrev_map = {
+        'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR', 'California': 'CA',
+        'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE', 'Florida': 'FL', 'Georgia': 'GA',
+        'Hawaii': 'HI', 'Idaho': 'ID', 'Illinois': 'IL', 'Indiana': 'IN', 'Iowa': 'IA',
+        'Kansas': 'KS', 'Kentucky': 'KY', 'Louisiana': 'LA', 'Maine': 'ME', 'Maryland': 'MD',
+        'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN', 'Mississippi': 'MS', 'Missouri': 'MO',
+        'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV', 'New Hampshire': 'NH', 'New Jersey': 'NJ',
+        'New Mexico': 'NM', 'New York': 'NY', 'North Carolina': 'NC', 'North Dakota': 'ND', 'Ohio': 'OH',
+        'Oklahoma': 'OK', 'Oregon': 'OR', 'Pennsylvania': 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC',
+        'South Dakota': 'SD', 'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT', 'Vermont': 'VT',
+        'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV', 'Wisconsin': 'WI', 'Wyoming': 'WY',
+        'District of Columbia': 'DC'
+    }
+    usa['STUSPS'] = usa['name'].map(state_abbrev_map)
+    
+    # Filter to continental US only
+    # Exclude AK, HI, PR, and any unmapped territories (NaN STUSPS)
+    usa_continental = usa[
+        (~usa['STUSPS'].isin(['AK', 'HI', 'PR'])) & 
+        (usa['STUSPS'].notna())
+    ].copy()
+    
+    # Merge data
+    usa_continental = usa_continental.merge(state_val, on='STUSPS', how='left')
+    
+    # Remove states without data (NaN values) to avoid distortion
+    usa_continental = usa_continental[usa_continental[value_col].notna()]
+    
+    # Create figure
+    fig, ax = plt.subplots(1, 1, figsize=(16, 10))
+    
+    # Get colormap for determining text contrast
+    cm = plt.get_cmap(cmap)
+    vmin = usa_continental[value_col].min()
+    vmax = usa_continental[value_col].max()
+    norm = plt.Normalize(vmin=vmin, vmax=vmax)
+    
+    # Use custom legend label if provided, otherwise format from column name
+    if legend_label is None:
+        legend_label = value_col.replace('_', ' ').title()
+    
+    # Plot the map with subtle light gray edges (no built-in legend)
+    usa_continental.plot(
+        column=value_col,
+        cmap=cmap,
+        linewidth=0.8,  # Subtle border
+        ax=ax,
+        edgecolor='#CCCCCC',  # Light gray borders
+        legend=False,  # We'll create our own colorbar
+        missing_kwds={'color': 'lightgrey', 'label': 'No Data'}
+    )
+    
+    # Create manual colorbar with full control
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
     sm.set_array([])
+    cbar = fig.colorbar(sm, ax=ax, orientation='horizontal', shrink=0.6, pad=0.02)
+    cbar.set_label(legend_label, fontsize=12)
+    cbar.ax.tick_params(labelsize=12)  # Larger tick font
+    cbar.outline.set_visible(False)  # Remove border
     
-    for state, (row, col) in state_coords.items():
-        val = state_val.get(state, np.nan)
-        color = sm.to_rgba(val) if not np.isnan(val) else '#EEEEEE'
-        
-        # Tile
-        rect = plt.Rectangle((col, -row), 1, 1, facecolor=color, edgecolor='white', linewidth=1.5)
-        ax.add_patch(rect)
-        
-        # Label
-        contrast_color = 'white' if np.mean(color[:3]) < 0.5 else COLORS['text']
-        ax.text(col+0.5, -row+0.6, state, ha='center', va='center', fontweight='bold', color=contrast_color, fontsize=11)
-        if not np.isnan(val):
-            val_txt = label_fmt.format(val)
-            if agg_func == 'sum' and val > 1000000: # Abbreviate millions
-                 val_txt = f"{val/1000000:.1f}M"
-            ax.text(col+0.5, -row+0.3, val_txt, ha='center', va='center', fontsize=9, color=contrast_color)
-
-    plt.xlim(-0.5, 12.5)
-    plt.ylim(-6.5, 1.5)
+    # Small states where labels would overlap - skip these
+    small_states = ['RI', 'CT', 'NJ', 'DE', 'MD', 'DC', 'VT', 'NH', 'MA']
     
-    # Title & Legend
-    ax.set_title(title, fontsize=20, fontweight='bold', color=COLORS['primary'], pad=20)
-    cbar = plt.colorbar(sm, ax=ax, fraction=0.03, pad=0.04)
-    cbar.outline.set_visible(False)
+    # Add state abbreviation labels and values at centroids
+    for idx, row in usa_continental.iterrows():
+        state_abbrev = row['STUSPS']
+        
+        # Skip small states to avoid overlapping labels
+        if state_abbrev in small_states:
+            continue
+        
+        # Use representative_point() which guarantees a point inside the polygon
+        # This works better than centroid for irregular shapes like FL, LA, MI
+        rep_point = row.geometry.representative_point()
+        label_x = rep_point.x
+        label_y = rep_point.y
+        
+        val = row[value_col]
+        val_text = human_format(val)
+        
+        # Determine text color based on background darkness
+        if pd.notna(val):
+            # Get the color for this value
+            rgba = cm(norm(val))
+            # Calculate luminance (brightness)
+            luminance = 0.299 * rgba[0] + 0.587 * rgba[1] + 0.114 * rgba[2]
+            # Use white text on dark backgrounds, black on light
+            text_color = 'white' if luminance < 0.5 else COLORS['text']
+        else:
+            text_color = COLORS['text']
+        
+        # Add state abbreviation
+        ax.annotate(
+            text=state_abbrev,
+            xy=(label_x, label_y + 0.3),  # Slightly above center
+            ha='center',
+            va='center',
+            fontsize=12,
+            fontweight='bold',
+            color=text_color
+        )
+        
+        # Add value below abbreviation
+        if val_text:
+            ax.annotate(
+                text=val_text,
+                xy=(label_x, label_y - 0.3),  # Slightly below center
+                ha='center',
+                va='center',
+                fontsize=10,
+                fontweight='bold',
+                color=text_color
+            )
+    
+    ax.axis('off')
+    ax.set_title(title, fontsize=20, fontweight='bold', color=COLORS['primary'], pad=10, y=0.95)
+    
+    # Add source note
+    fig.text(0.5, 0.02, 'Data: FARS & Census (2010-2023) | Continental US Only', 
+             ha='center', fontsize=9, color='grey', style='italic')
     
     save(filename)
 
-# --- COMPLEX INFOGRAPHIC (RESTORED) ---
-def create_complex_infographic(df):
-    """Restores the requested 'Old Style' composite infographic."""
-    print("Generating Composite Infographic...")
-    fig = plt.figure(figsize=(18, 12))
-    gs = gridspec.GridSpec(2, 3, height_ratios=[1, 1])
+# --- POSTER INFOGRAPHIC (NEW PROFESSIONAL DESIGN) ---
+def create_poster_infographic(df):
+    """Generates a professional 'Tale of Two Worlds' comparison poster."""
+    print("Generating Professional Poster Infographic...")
     
-    # Main Header Area (Implicit in top chart)
-    fig.suptitle("The Hidden Cost of Inequality on American Roads\nAnalysis of 14 Years of Fatality & Education Data (2010-2023)", 
-                 fontsize=24, fontweight='bold', color=COLORS['primary'], y=0.98)
+    # 1. Prepare Data: High Edu vs Low Edu (Quartiles)
+    high_edu = df[df['Edu_Group'].str.contains('High Edu')] # Top Quartile
+    low_edu = df[df['Edu_Group'].str.contains('Low Edu')]   # Bottom Quartile
     
-    # 1. Main Trend Line (Top Left spanning 2 cols)
-    ax1 = fig.add_subplot(gs[0, :2])
-    d_trend = df.groupby('Year')['Fatality_Rate'].mean().reset_index()
-    sns.lineplot(data=d_trend, x='Year', y='Fatality_Rate', ax=ax1, color=COLORS['danger'], linewidth=4, marker='o', markersize=8)
-    apply_theme(ax1, "Rising Fatality Rates Per Capita (2010-2023)", "Year", "Fatalities / 100k")
+    stats = {
+        'high': {
+            'fatality': high_edu['Fatality_Rate'].mean(),
+            'alcohol': high_edu['Drunk_Rate_Per_100k'].mean(),
+            'weather': high_edu['Weather_Pct'].mean(),
+            'dark': high_edu['Dark_Pct'].mean(),
+            'pop_label': "Urban / Suburban"
+        },
+        'low': {
+            'fatality': low_edu['Fatality_Rate'].mean(),
+            'alcohol': low_edu['Drunk_Rate_Per_100k'].mean(),
+            'weather': low_edu['Weather_Pct'].mean(),
+            'dark': low_edu['Dark_Pct'].mean(),
+            'pop_label': "Rural / Isolated"
+        }
+    }
     
-    # 2. Key Stats (Top Right)
-    ax2 = fig.add_subplot(gs[0, 2])
-    ax2.axis('off')
-    low_edu_rate = df[df['Edu_Group'] == 'Low Edu (High Risk)']['Fatality_Rate'].mean()
-    high_edu_rate = df[df['Edu_Group'] == 'High Edu (Low Risk)']['Fatality_Rate'].mean()
+    # Setup Canvas
+    fig = plt.figure(figsize=(16, 12))
+    fig.patch.set_facecolor('#F4F6F6') # Light Neutral Grey Background
+    gs = gridspec.GridSpec(10, 2)
     
-    ax2.text(0.5, 0.8, "The Education Gap", ha='center', fontsize=20, fontweight='bold', color=COLORS['text'])
-    ax2.text(0.5, 0.6, f"{low_edu_rate:.1f}", ha='center', fontsize=60, fontweight='bold', color=COLORS['danger'])
-    ax2.text(0.5, 0.5, "Fatalities/100k in Low Edu Counties", ha='center', fontsize=12, color=COLORS['text'])
-    ax2.text(0.5, 0.4, "vs", ha='center', fontsize=16, style='italic', color=COLORS['grid'])
-    ax2.text(0.5, 0.25, f"{high_edu_rate:.1f}", ha='center', fontsize=40, fontweight='bold', color=COLORS['safety'])
-    ax2.text(0.5, 0.15, "in High Edu Counties", ha='center', fontsize=12, color=COLORS['text'])
+    # --- HEADER ---
+    ax_header = fig.add_subplot(gs[0:2, :])
+    ax_header.axis('off')
+    ax_header.text(0.5, 0.7, "THE EDUCATION SAFETY GAP", ha='center', va='center', fontsize=32, fontweight='extra bold', color=COLORS['primary'])
+    ax_header.text(0.5, 0.35, "How Educational Attainment Correlates with Traffic Mortality (2010-2023)", ha='center', va='center', fontsize=16, color=COLORS['text'])
+    ax_header.axhline(y=0.1, xmin=0.1, xmax=0.9, color=COLORS['grid'], linewidth=2)
 
-    # 3. Bar Chart (Bottom Left)
-    ax3 = fig.add_subplot(gs[1, 0])
-    d_alc = df.groupby('Edu_Group')['Drunk_Pct'].mean().reset_index()
-    # Ensure correct order
-    d_alc = d_alc.sort_index(ascending=False) # Plot Low Risky first? No, let's follow index
-    sns.barplot(data=d_alc, x='Edu_Group', y='Drunk_Pct', palette="Reds", ax=ax3)
-    ax3.set_xticklabels(['High Edu', 'Med-High', 'Med-Low', 'Low Edu'], fontsize=9)
-    apply_theme(ax3, "Alcohol Factor %", "Education Group", "% Drunk Driving")
-
-    # 4. Scatter Plot (Bottom Middle)
-    ax4 = fig.add_subplot(gs[1, 1])
-    smp = df.sample(3000)
-    sns.scatterplot(data=smp, x='Pct_Less_HS', y='Fatality_Rate', hue='Urbanicity', palette={'Urban':COLORS['accent'], 'Rural':COLORS['danger']}, alpha=0.4, s=20, ax=ax4, legend=False)
-    # Fake legend
-    ax4.text(0.95, 0.95, "• Rural", color=COLORS['danger'], transform=ax4.transAxes, ha='right', fontweight='bold')
-    ax4.text(0.95, 0.90, "• Urban", color=COLORS['accent'], transform=ax4.transAxes, ha='right', fontweight='bold')
-    apply_theme(ax4, "Education vs. Risk", "% Less than HS", "Fatality Rate")
-
-    # 5. Box Plot (Bottom Right)
-    ax5 = fig.add_subplot(gs[1, 2])
-    sns.boxplot(data=df, x='Urbanicity', y='Fatality_Rate', palette={'Urban':COLORS['safety'], 'Rural':COLORS['danger']}, ax=ax5)
-    apply_theme(ax5, "Urban vs. Rural Risk", "Urbanicity", "Fatality Rate")
+    # --- LEFT PANEL (HIGH EDU / SAFE) ---
+    ax_left = fig.add_subplot(gs[2:9, 0])
+    ax_left.axis('off')
     
-    # Footer
-    fig.text(0.5, 0.02, "CONCLUSION: Communities with lower education levels face significantly higher risks, largely driven by rural infrastructure challenges and higher rates of alcohol involvement.", 
-             ha='center', fontsize=12, style='italic', backgroundcolor='#ecf0f1')
+    # Background Box
+    rect_left = plt.Rectangle((0.05, 0), 0.9, 1, transform=ax_left.transAxes, color='white', zorder=0)
+    ax_left.add_patch(rect_left)
+    ax_left.text(0.5, 0.92, "HIGH GRADUATION RATE", transform=ax_left.transAxes, ha='center', fontsize=18, fontweight='bold', color=COLORS['safety'])
+    ax_left.text(0.5, 0.88, stats['high']['pop_label'], transform=ax_left.transAxes, ha='center', fontsize=12, style='italic', color='#7F8C8D')
+
+    # Main Metric: Fatality Rate
+    ax_left.text(0.5, 0.75, f"{stats['high']['fatality']:.1f}", transform=ax_left.transAxes, ha='center', fontsize=70, fontweight='bold', color=COLORS['safety'])
+    ax_left.text(0.5, 0.68, "Fatalities per 100k", transform=ax_left.transAxes, ha='center', fontsize=12, color=COLORS['text'])
     
+    # Secondary Metrics
+    y_start = 0.50
+    gap = 0.12
+    
+    # Alcohol
+    ax_left.text(0.5, y_start, "Alcohol Incidents / 100k", transform=ax_left.transAxes, ha='center', fontsize=10, fontweight='bold', color=COLORS['primary'])
+    ax_left.text(0.5, y_start-0.05, f"{stats['high']['alcohol']:.1f}", transform=ax_left.transAxes, ha='center', fontsize=28, fontweight='bold', color=COLORS['safety'])
+    
+    # Dark
+    ax_left.text(0.5, y_start-gap, "Low Light Crash (Pct)", transform=ax_left.transAxes, ha='center', fontsize=10, fontweight='bold', color=COLORS['primary'])
+    ax_left.text(0.5, y_start-gap-0.05, f"{stats['high']['dark']:.1f}%", transform=ax_left.transAxes, ha='center', fontsize=28, fontweight='bold', color=COLORS['safety'])
+
+    # --- RIGHT PANEL (LOW EDU / RISKY) ---
+    ax_right = fig.add_subplot(gs[2:9, 1])
+    ax_right.axis('off')
+    
+    # Background Box
+    rect_right = plt.Rectangle((0.05, 0), 0.9, 1, transform=ax_right.transAxes, color='white', zorder=0)
+    ax_right.add_patch(rect_right)
+    ax_right.text(0.5, 0.92, "LOW GRADUATION RATE", transform=ax_right.transAxes, ha='center', fontsize=18, fontweight='bold', color=COLORS['danger'])
+    ax_right.text(0.5, 0.88, stats['low']['pop_label'], transform=ax_right.transAxes, ha='center', fontsize=12, style='italic', color='#7F8C8D')
+
+    # Main Metric: Fatality Rate
+    ax_right.text(0.5, 0.75, f"{stats['low']['fatality']:.1f}", transform=ax_right.transAxes, ha='center', fontsize=70, fontweight='bold', color=COLORS['danger'])
+    ax_right.text(0.5, 0.68, "Fatalities per 100k", transform=ax_right.transAxes, ha='center', fontsize=12, color=COLORS['text'])
+    
+    # Secondary Metrics
+    # Alcohol
+    ax_right.text(0.5, y_start, "Alcohol Incidents / 100k", transform=ax_right.transAxes, ha='center', fontsize=10, fontweight='bold', color=COLORS['primary'])
+    ax_right.text(0.5, y_start-0.05, f"{stats['low']['alcohol']:.1f}", transform=ax_right.transAxes, ha='center', fontsize=28, fontweight='bold', color=COLORS['danger'])
+    
+    # Dark
+    ax_right.text(0.5, y_start-gap, "Low Light Crash (Pct)", transform=ax_right.transAxes, ha='center', fontsize=10, fontweight='bold', color=COLORS['primary'])
+    ax_right.text(0.5, y_start-gap-0.05, f"{stats['low']['dark']:.1f}%", transform=ax_right.transAxes, ha='center', fontsize=28, fontweight='bold', color=COLORS['danger'])
+
+    # --- CROSS COMPARISON (Visual Bars) ---
+    # Add small visual bars under the numbers
+    def draw_bar(ax, x, y, val, max_val, color):
+        width = (val / max_val) * 0.4
+        rect = plt.Rectangle((x - width/2, y), width, 0.015, transform=ax.transAxes, color=color)
+        ax.add_patch(rect)
+        # Background bar
+        rect_bg = plt.Rectangle((x - 0.2, y), 0.4, 0.015, transform=ax.transAxes, color='#ECF0F1', zorder=-1)
+        ax.add_patch(rect_bg)
+
+    # Max values for scaling
+    max_alc = max(stats['high']['alcohol'], stats['low']['alcohol']) * 1.2
+    max_drk = max(stats['high']['dark'], stats['low']['dark']) * 1.2
+
+    draw_bar(ax_left, 0.5, y_start-0.07, stats['high']['alcohol'], max_alc, COLORS['safety'])
+    draw_bar(ax_left, 0.5, y_start-gap-0.07, stats['high']['dark'], max_drk, COLORS['safety'])
+    
+    draw_bar(ax_right, 0.5, y_start-0.07, stats['low']['alcohol'], max_alc, COLORS['danger'])
+    draw_bar(ax_right, 0.5, y_start-gap-0.07, stats['low']['dark'], max_drk, COLORS['danger'])
+
+    # --- FOOTER ---
+    ax_footer = fig.add_subplot(gs[9, :])
+    ax_footer.axis('off')
+    ratio = stats['low']['fatality'] / stats['high']['fatality']
+    ax_footer.text(0.5, 0.5, f"KEY INSIGHT: Rural, low-education counties face a {ratio:.1f}x higher risk of death per capita.", 
+                   ha='center', va='center', fontsize=16, fontweight='bold', color='white', 
+                   bbox=dict(facecolor=COLORS['primary'], edgecolor='none', boxstyle='round,pad=1'))
+
     save("INFOGRAPHIC_Composite.png")
 
 # --- EDA GRAPH SUITE ---
@@ -260,16 +449,48 @@ def run_eda(df):
     d = df.groupby('Year')['Fatality_Rate'].mean().reset_index()
     sns.lineplot(data=d, x='Year', y='Fatality_Rate', color=COLORS['danger'], linewidth=3, marker='o')
     apply_theme(plt.gca(), "1. Avg Fatality Rate Over Time", "Year", "Fatalities per 100k")
+    plt.ylim(bottom=0) # START AT 0
     save("EDA_01_Trend_Fatality.png")
     
     # 2. Total Accidents vs Fatalities (Dual Axis)
+    # 2. Total Accidents vs Fatalities (Dual Axis) - IMPROVED
     d2 = df.groupby('Year')[['FATALS', 'ST_CASE']].sum().reset_index()
     fig, ax1 = plt.subplots(figsize=(10,6))
-    ax1.bar(d2['Year'], d2['ST_CASE'], color=COLORS['primary'], alpha=0.3, label='Accidents')
+    
+    # Left Axis: Accidents (Education Color / Blue)
+    ax1.bar(d2['Year'], d2['ST_CASE'], color=COLORS['education'], alpha=0.3)
+    ax1.set_xlabel("Year", fontweight='bold')
+    ax1.set_ylabel("Total Accidents (Millions)", color=COLORS['education'], fontweight='bold')
+    ax1.tick_params(axis='y', colors=COLORS['education'])
+    ax1.spines['left'].set_color(COLORS['education'])
+    ax1.spines['left'].set_linewidth(2)
+    
+    # Right Axis: Fatalities (Danger Color / Red)
     ax2 = ax1.twinx()
-    ax2.plot(d2['Year'], d2['FATALS'], color=COLORS['danger'], linewidth=3, marker='D', label='Fatalities')
-    apply_theme(ax1, "2. Total Accidents vs Fatalities", "Year", "Accidents")
-    ax2.set_ylabel("Fatalities", color=COLORS['danger'])
+    ax2.plot(d2['Year'], d2['FATALS'], color=COLORS['danger'], linewidth=4, marker='D', markersize=8)
+    ax2.set_ylabel("Total Fatalities", color=COLORS['danger'], fontweight='bold')
+    ax2.tick_params(axis='y', colors=COLORS['danger'])
+    ax2.spines['right'].set_color(COLORS['danger'])
+    ax2.spines['right'].set_linewidth(2)
+    
+    # Clean other spines
+    ax1.spines['top'].set_visible(False)
+    ax2.spines['top'].set_visible(False)
+    ax1.spines['right'].set_visible(False) # Hide primary right
+    ax2.spines['left'].set_visible(False)  # Hide secondary left
+    
+    # Unified Legend
+    legend_elements = [
+        Patch(facecolor=COLORS['education'], alpha=0.3, label='Total Accidents (Left Scale)'),
+        Line2D([0], [0], color=COLORS['danger'], lw=4, marker='D', label='Total Fatalities (Right Scale)')
+    ]
+    ax1.legend(handles=legend_elements, loc='upper center', ncol=2, frameon=False, fontsize=10)
+    
+    # Title
+    ax1.set_title("2. Volume vs. Lethality: Accidents are Flat, but Deaths are Rising", 
+                  loc='left', pad=20, color=COLORS['primary'], fontweight='bold', fontsize=14)
+    ax1.grid(axis='y', linestyle='--', alpha=0.3)
+    
     save("EDA_02_Dual_Totals.png")
     
     # 3. Fatality Distribution (Hist)
@@ -293,24 +514,44 @@ def run_eda(df):
     apply_theme(plt.gca(), "5. Fatality Rate by Education Level", "", "Avg Fatality Rate")
     save("EDA_05_Bar_Edu.png")
     
-    # 6. Scatter Edu vs Fatality
+    # 6. Scatter Edu vs Fatality (County Averages)
     plt.figure()
-    sns.scatterplot(data=df.sample(5000), x='Pct_Less_HS', y='Fatality_Rate', hue='Urbanicity', palette={'Rural':COLORS['danger'], 'Urban':COLORS['safety']}, alpha=0.3)
-    apply_theme(plt.gca(), "6. Education vs Fatality Correlation", "% Less Than HS", "Fatality Rate")
+    # Average each county across all years for a stable representation
+    county_avg = df.groupby('FIPS_STR').agg({
+        'Pct_Less_HS': 'mean',
+        'Fatality_Rate': 'mean',
+        'Urbanicity': 'first'  # Use the most common urbanicity classification
+    }).reset_index()
+    sns.scatterplot(data=county_avg, x='Pct_Less_HS', y='Fatality_Rate', hue='Urbanicity', palette={'Rural':COLORS['danger'], 'Urban':COLORS['safety']}, alpha=0.3)
+    apply_theme(plt.gca(), "6. Education vs Fatality Correlation", "% Without High School Diploma", "Fatalities per 100k Population")
     plt.ylim(0, 150)
     save("EDA_06_Scatter_Corr.png")
     
-    # 7. Alcohol Trend by Edu
+    # 7. Alcohol Trend by Edu - FIXED METRIC
     plt.figure()
-    d7 = df.groupby(['Year', 'Edu_Group'])['Drunk_Pct'].mean().reset_index()
-    sns.lineplot(data=d7, x='Year', y='Drunk_Pct', hue='Edu_Group', palette="magma")
-    apply_theme(plt.gca(), "7. Alcohol Involvement Trends by Group", "Year", "% Accidents with Alcohol")
+    d7 = df.groupby(['Year', 'Edu_Group'])['Drunk_Rate_Per_100k'].mean().reset_index()
+    sns.lineplot(data=d7, x='Year', y='Drunk_Rate_Per_100k', hue='Edu_Group', palette=[COLORS['safety'], COLORS['education'], COLORS['danger'], '#000000']) # Custom discrete
+    apply_theme(plt.gca(), "7. Alcohol Fatalities per 100k Population", "Year", "Alcohol Incidents / 100k")
+    plt.ylim(bottom=0)
     save("EDA_07_Line_Alcohol.png")
     
     # 8. Dark Accidents Bar
     plt.figure()
-    sns.barplot(data=df, x='Edu_Group', y='Dark_Pct', palette="cividis", order=o)
-    apply_theme(plt.gca(), "8. Nighttime Accidents by Education", "", "% Dark Accidents")
+    palette = [
+    COLORS['safety'],
+    COLORS['education'],
+    COLORS['danger'],
+    '#4D4D4D'   # dark gray (WCAG friendly)
+    ]
+
+    sns.barplot(
+        data=df,
+        x='Edu_Group',
+        y='Dark_Pct',
+        palette=palette,
+        order=o
+    )
+    apply_theme(plt.gca(), "8. Night Time Accidents by Education", "", "% Dark Accidents")
     save("EDA_08_Bar_Dark.png")
     
     # 9. Hexbin Density (Fixed labels)
@@ -366,18 +607,38 @@ def run_eda(df):
 def run_exda_and_maps(df, state_coords):
     print("Generating ExDA and Maps...")
     
-    # MAPS
-    plot_state_grid(df, state_coords, 'Fatality_Rate', "Average Fatality Rate by State", "MAP_Fatality_Rate.png", 'Reds', 'mean')
-    plot_state_grid(df, state_coords, 'Pct_Less_HS', "Average % Less Than HS by State", "MAP_Education.png", 'Blues', 'mean')
-    plot_state_grid(df, state_coords, 'Population', "Total State Population (2010-2023 Avg)", "MAP_Population.png", 'Greens', 'sum')
+    # MAPS - Using proper USA choropleth maps with custom legend labels
+    plot_usa_choropleth(df, 'Fatality_Rate', "Average Fatality Rate by State", "MAP_Fatality_Rate.png", 'Reds', 'mean', 
+                        legend_label="Fatalities per 100k Population")
+    plot_usa_choropleth(df, 'Pct_Less_HS', "Population without High School Diploma (%)", "MAP_Education.png", 'Blues', 'mean',
+                        legend_label="% Without High School Diploma")
+    
+    # Fix Population Map: Verify we are averaging the *State Totals*, not averaging County Pops
+    # 1. Sum Population by State and Year
+    pop_agg = df.groupby(['State_Abbrev', 'Year'])['Population'].sum().reset_index()
+    # 2. Plot the Mean of these Annual Totals
+    plot_usa_choropleth(pop_agg, 'Population', "Avg State Population (2010-2023)", "MAP_Population.png", 'Greens', 'mean',
+                        legend_label="Population in Millions")
 
     # ExDA 1: Feature Importance
+    # ExDA 1: Feature Importance - RENAMED LABELS
     plt.figure()
-    f = df[['Fatality_Rate', 'Pct_Less_HS', 'Drunk_Pct', 'Dark_Pct', 'Population']].dropna()
+    f = df[['Fatality_Rate', 'Pct_Less_HS', 'Drunk_Rate_Per_100k', 'Dark_Pct', 'Population', 'Weather_Pct']].dropna()
     rf = RandomForestRegressor(n_estimators=50).fit(f.drop('Fatality_Rate', axis=1), f['Fatality_Rate'])
     imp = pd.DataFrame({'Feature':f.drop('Fatality_Rate', axis=1).columns, 'Importance':rf.feature_importances_}).sort_values('Importance', ascending=False)
-    sns.barplot(data=imp, x='Importance', y='Feature', palette='viridis')
-    apply_theme(plt.gca(), "ExDA 1: What drives Fatality Rate?", "Importance", "Factor")
+    
+    # Rename for Audience
+    name_map = {
+        'Pct_Less_HS': 'Education Level',
+        'Drunk_Rate_Per_100k': 'Alcohol Incidents',
+        'Dark_Pct': 'Lighting Conditions',
+        'Population': 'Population Density',
+        'Weather_Pct': 'Bad Weather'
+    }
+    imp['Feature'] = imp['Feature'].map(name_map)
+    
+    sns.barplot(data=imp, x='Importance', y='Feature', color=COLORS['education'])
+    apply_theme(plt.gca(), "ExDA 1: Risk Factors Ranked by Importance", "Relative Importance", "Factor")
     save("EXDA_01_Feature_Imp.png")
     
     # ExDA 2: Cluster Heatmap
@@ -397,7 +658,7 @@ def main():
     df, state_coords = load_data()
     print(f"Loaded {len(df)} records.")
     
-    create_complex_infographic(df) # The "Old Style" one
+    create_poster_infographic(df) # The New Professional Poster
     run_eda(df)
     run_exda_and_maps(df, state_coords)
     print("Done.")
