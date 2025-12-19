@@ -258,7 +258,7 @@ datasets/
     └── ...
 ```
 
-> **Important**: The analysis script looks for `accident.csv` (or `ACCIDENT.CSV`) inside each FARS folder. Make sure this file exists after extraction.
+> **Important**: The analysis script looks for `accident.csv` (or `ACCIDENT.CSV`) inside each FARS folder. Make sure this file exists after extraction along with the other dataset files.
 
 ---
 
